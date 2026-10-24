@@ -452,6 +452,35 @@ function load(id, autoplay) {
   state.current = id; store.set("last", id);
   state.playing = false; triedPlain = false;
   audio.pause();
+  
+if (t.youtube && t.youtubeId) {
+  useEl(audioMain);
+  state.playing = false;
+  setMedia(t);
+  renderNow();
+  renderPlayState();
+
+  const playerBox = document.querySelector(".youtubeEmbeddedPlayer");
+  if (playerBox) playerBox.remove();
+
+  const player = document.createElement("iframe");
+  player.width = "100%";
+  player.height = "220";
+  player.src = "https://www.youtube-nocookie.com/embed/" +
+    encodeURIComponent(t.youtubeId) +
+    (autoplay ? "?autoplay=1" : "");
+  player.title = t.title;
+  player.allow = "autoplay; encrypted-media; picture-in-picture";
+  player.allowFullscreen = true;
+  player.style.border = "0";
+
+  const box = document.createElement("div");
+  box.className = "youtubeEmbeddedPlayer";
+  box.appendChild(player);
+  document.querySelector("#main").prepend(box);
+  return;
+}
+
   useEl(audioMain);
   if (curUrl) { URL.revokeObjectURL(curUrl); curUrl = null; }
   if (t.blob) { curUrl = URL.createObjectURL(t.blob); audio.src = curUrl; }
