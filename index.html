@@ -719,52 +719,6 @@ async function ensureSaved(t) {
   await dbPut("tracks", c); state.tracks.push(c);
   return c;
 }
-  async function downloadTrack(t) {
-  try {
-    if (state.tracks.find(x => x.id === t.id && x.blob)) {
-      toast("Esta canción ya está descargada");
-      return;
-    }
-
-    if (!t.url) {
-      toast("No se puede descargar esta canción");
-      return;
-    }
-
-    toast("Descargando «" + t.title + "»…");
-
-    const r = await fetch(t.url);
-    if (!r.ok) throw new Error("Error de descarga");
-
-    const blob = await r.blob();
-
-    const saved = {
-      ...t,
-      remote: false,
-      blob: blob,
-      duration: t.duration || await getDuration(blob),
-      added: Date.now()
-    };
-
-    await dbPut("tracks", saved);
-
-    const index = state.tracks.findIndex(x => x.id === t.id);
-
-    if (index >= 0) {
-      state.tracks[index] = saved;
-    } else {
-      state.tracks.push(saved);
-    }
-
-    renderMain();
-
-    toast("✓ Canción descargada para escuchar sin internet");
-
-  } catch (e) {
-    console.error(e);
-    toast("No se pudo descargar la canción");
-  }
-}
 async function toggleFav(t0) {
   const t = await ensureSaved(t0);
   t.fav = !t.fav; await dbPut("tracks", t);
@@ -791,85 +745,22 @@ async function newPlaylist(thenAdd) {
   return p;
 }
 function trackMenu(t) {
-  const inPl = state.view.startsWith("pl:")
-    ? state.playlists.find(p => p.id === state.view.slice(3))
-    : null;
-
+  const inPl = state.view.startsWith("pl:") ? state.playlists.find(p => p.id === state.view.slice(3)) : null;
   const acts = [
-    {
-      label: "Reproducir",
-      fn: () => playTrack(t.id, visibleTracks())
-    },
-
-    ...(t.remote && !t.blob
-      ? [{
-          label: "Descargar para escuchar sin internet 🎵",
-          fn: () => downloadTrack(t)
-        }]
-      : []),
-
-    {
-      label: "Reproducir a continuación",
-      fn: () => {
-        if (!state.queue.length) {
-          playTrack(t.id);
-          return;
-        }
-
+    { label: "Reproducir", fn: () => playTrack(t.id, visibleTracks()) },
+    { label: "Reproducir a continuación", fn: () => {
+        if (!state.queue.length) { playTrack(t.id); return; }
         state.queue = state.queue.filter(i => i !== t.id);
-
         const at = state.queue.indexOf(state.current);
-
-        state.queue.splice(at + 1, 0, t.id);
-        state.queueIdx = state.queue.indexOf(state.current);
-
+        state.queue.splice(at + 1, 0, t.id); state.queueIdx = state.queue.indexOf(state.current);
         toast("Sonará a continuación");
-      }
-    },
-
-    ...(t.remote && !state.tracks.some(x => x.id === t.id)
-      ? [{
-          label: "Guardar en mi biblioteca",
-          fn: async () => {
-            await ensureSaved(t);
-            renderMain();
-            toast("Guardada en tu biblioteca");
-          }
-        }]
-      : []),
-
-    {
-      label: "Añadir a una lista…",
-      fn: () => addToListMenu(t)
-    },
-
-    {
-      label: t.fav
-        ? "Quitar de favoritas"
-        : "Marcar como favorita",
-      fn: () => toggleFav(t)
-    }
+      } },
+    ...(t.remote && !state.tracks.some(x => x.id === t.id) ? [{ label: "Guardar en mi biblioteca", fn: async () => { await ensureSaved(t); renderMain(); toast("Guardada en tu biblioteca"); } }] : []),
+    { label: "Añadir a una lista…", fn: () => addToListMenu(t) },
+    { label: t.fav ? "Quitar de favoritas" : "Marcar como favorita", fn: () => toggleFav(t) },
   ];
-
-  if (inPl) {
-    acts.push({
-      label: "Quitar de esta lista",
-      fn: async () => {
-        inPl.ids = inPl.ids.filter(i => i !== t.id);
-        await dbPut("playlists", inPl);
-        renderMain();
-      }
-    });
-  }
-
-  if (state.tracks.some(x => x.id === t.id)) {
-    acts.push({
-      label: "Eliminar de la biblioteca",
-      danger: true,
-      fn: () => deleteTrack(t)
-    });
-  }
-
+  if (inPl) acts.push({ label: "Quitar de esta lista", fn: async () => { inPl.ids = inPl.ids.filter(i => i !== t.id); await dbPut("playlists", inPl); renderMain(); } });
+  if (state.tracks.some(x => x.id === t.id)) acts.push({ label: "Eliminar de la biblioteca", danger: true, fn: () => deleteTrack(t) });
   openSheet(t.title, acts);
 }
 function addToListMenu(t) {
