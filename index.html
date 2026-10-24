@@ -181,11 +181,12 @@ dialog::backdrop{background:rgba(4,16,20,.55)}
   </header>
 
   <nav class="tabs" role="tablist" aria-label="Secciones">
-    <button role="tab" data-view="library">Biblioteca</button>
-    <button role="tab" data-view="online">Online</button>
-    <button role="tab" data-view="favs">Favoritas</button>
-    <button role="tab" data-view="lists">Listas</button>
-  </nav>
+  <button role="tab" data-view="library">Biblioteca</button>
+  <button role="tab" data-view="online">Online</button>
+  <button role="tab" data-view="youtube">YouTube</button>
+  <button role="tab" data-view="favs">Favoritas</button>
+  <button role="tab" data-view="lists">Listas</button>
+</nav>
 
   <div id="searchbar"><input id="search" type="search" placeholder="Buscar canción o artista" autocomplete="off" aria-label="Buscar"></div>
   <main id="main"></main>
@@ -569,12 +570,17 @@ function emptyState(title, text, withActions) {
 function renderTabs() {
   const base = state.view.startsWith("pl:") ? "lists" : state.view;
   $$(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.view === base)));
-  $("#searchbar").hidden = !(state.view === "library" || state.view === "favs");
+  $("#searchbar").hidden = !(state.view === "library" || state.view === "favs" || state.view === "youtube");
 }
 function renderMain() {
   renderTabs();
   const main = $("#main"); main.replaceChildren();
   const v = state.view;
+  if (v === "youtube") {
+  renderYouTube(main);
+  markPlaying();
+  return;
+}
   if (v === "online") { renderOnline(main); markPlaying(); return; }
   if (v === "lists") {
     main.append(h("div", { class: "section-title" }, h("h2", {}, "Tus listas"),
@@ -617,6 +623,36 @@ function renderMain() {
 }
 /* ---------- Música en línea (Audius, catálogo abierto de artistas independientes) ---------- */
 const AUDIUS = "https://api.audius.co/v1", APP_NAME = "Summertime";
+  // ===== YOUTUBE =====
+const YOUTUBE_API_KEY = "AIzaSyA8habf6E1sEUKvRZWj9azxgOvTBj4KxUQ";
+
+async function searchYouTube(query) {
+  if (!query.trim()) return [];
+
+  const url =
+    "https://www.googleapis.com/youtube/v3/search" +
+    "?part=snippet" +
+    "&q=" + encodeURIComponent(query) +
+    "&type=video" +
+    "&videoCategoryId=10" +
+    "&maxResults=20" +
+    "&key=" + YOUTUBE_API_KEY;
+
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("Error al buscar en YouTube");
+
+  const data = await r.json();
+
+  return (data.items || []).map(x => ({
+    id: "yt_" + x.id.videoId,
+    youtubeId: x.id.videoId,
+    title: x.snippet.title,
+    artist: x.snippet.channelTitle,
+    cover: x.snippet.thumbnails?.medium?.url || "",
+    remote: true,
+    youtube: true
+  }));
+}
 async function audiusFetch(path, params = {}) {
   const u = new URL(AUDIUS + path);
   u.searchParams.set("app_name", APP_NAME);
@@ -656,6 +692,129 @@ function playUrl(raw) {
   const t = { id: "url:" + hashHue(raw), title: last || u.hostname, artist: u.hostname, duration: 0, remote: true, art: "", fav: false, url: raw };
   playTrack(t.id, [t]);
 }
+  function escapeHtml(text) {
+  return String(text ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
+}
+  function renderYouTube(main) {
+  const box = document.createElement("div");
+  box.className = "online";
+
+  box.innerHTML = `
+    <div style="padding:16px">
+      <h2>YouTube 🎬</h2>
+      <p>Busca música en YouTube</p>
+
+      <div style="display:flex;gap:8px;margin:12px 0">
+        <input
+          id="youtubeSearch"
+          type="search"
+          placeholder="Buscar canción o artista"
+          autocomplete="off"
+          style="flex:1"
+        >
+        <button id="youtubeSearchBtn">Buscar</button>
+      </div>
+
+      <div id="youtubeResults"></div>
+    </div>
+  `;
+
+  main.appendChild(box);
+
+  const input = box.querySelector("#youtubeSearch");
+  const button = box.querySelector("#youtubeSearchBtn");
+  const results = box.querySelector("#youtubeResults");
+
+  async function doSearch() {
+    const q = input.value.trim();
+
+    if (!q) {
+      results.innerHTML = "<p>Escribe una canción o artista.</p>";
+      return;
+    }
+
+    results.innerHTML = "<p>Buscando en YouTube…</p>";
+
+    try {
+      const tracks = await searchYouTube(q);
+
+      if (!tracks.length) {
+        results.innerHTML = "<p>No se encontraron resultados.</p>";
+        return;
+      }
+
+      results.innerHTML = "";
+
+      tracks.forEach(t => {
+        const row = document.createElement("div");
+
+        row.style.cssText =
+          "display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #ddd";
+
+        row.innerHTML = `
+          <img
+            src="${t.cover}"
+            width="70"
+            height="50"
+            style="object-fit:cover;border-radius:6px"
+          >
+
+          <div style="flex:1">
+            <div style="font-weight:600">${escapeHtml(t.title)}</div>
+            <div style="font-size:13px;opacity:.7">
+              ${escapeHtml(t.artist)}
+            </div>
+          </div>
+
+          <button class="youtubePlay">▶️</button>
+        `;
+
+        
+row.querySelector(".youtubePlay").addEventListener("click", () => {
+  const player = document.createElement("iframe");
+  player.width = "100%";
+  player.height = "220";
+  player.src = "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(t.youtubeId) + "?autoplay=1";
+  player.title = t.title;
+  player.allow = "autoplay; encrypted-media; picture-in-picture";
+  player.allowFullscreen = true;
+  player.style.border = "0";
+  player.style.borderRadius = "12px";
+
+  const oldPlayer = main.querySelector(".youtubeEmbeddedPlayer");
+  if (oldPlayer) oldPlayer.remove();
+
+  const container = document.createElement("div");
+  container.className = "youtubeEmbeddedPlayer";
+  container.style.margin = "12px 0";
+  container.appendChild(player);
+
+  results.prepend(container);
+});
+
+        results.appendChild(row);
+      });
+
+    } catch (e) {
+      console.error(e);
+      results.innerHTML =
+        "<p>No se pudo conectar con YouTube. Revisa la clave de API.</p>";
+    }
+  }
+
+  button.addEventListener("click", doSearch);
+
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter") doSearch();
+  });
+}
+
 function renderOnline(main) {
   const o = state.online;
   const input = h("input", { class: "field", id: "oq", type: "search", placeholder: "Buscar canciones, artistas o géneros", value: o.q || "", autocomplete: "off", "aria-label": "Buscar música en línea" });
@@ -719,6 +878,52 @@ async function ensureSaved(t) {
   await dbPut("tracks", c); state.tracks.push(c);
   return c;
 }
+  async function downloadTrack(t) {
+  try {
+    if (state.tracks.find(x => x.id === t.id && x.blob)) {
+      toast("Esta canción ya está descargada");
+      return;
+    }
+
+    if (!t.url) {
+      toast("No se puede descargar esta canción");
+      return;
+    }
+
+    toast("Descargando «" + t.title + "»…");
+
+    const r = await fetch(t.url);
+    if (!r.ok) throw new Error("Error de descarga");
+
+    const blob = await r.blob();
+
+    const saved = {
+      ...t,
+      remote: false,
+      blob: blob,
+      duration: t.duration || await getDuration(blob),
+      added: Date.now()
+    };
+
+    await dbPut("tracks", saved);
+
+    const index = state.tracks.findIndex(x => x.id === t.id);
+
+    if (index >= 0) {
+      state.tracks[index] = saved;
+    } else {
+      state.tracks.push(saved);
+    }
+
+    renderMain();
+
+    toast("✓ Canción descargada para escuchar sin internet");
+
+  } catch (e) {
+    console.error(e);
+    toast("No se pudo descargar la canción");
+  }
+}
 async function toggleFav(t0) {
   const t = await ensureSaved(t0);
   t.fav = !t.fav; await dbPut("tracks", t);
@@ -745,22 +950,85 @@ async function newPlaylist(thenAdd) {
   return p;
 }
 function trackMenu(t) {
-  const inPl = state.view.startsWith("pl:") ? state.playlists.find(p => p.id === state.view.slice(3)) : null;
+  const inPl = state.view.startsWith("pl:")
+    ? state.playlists.find(p => p.id === state.view.slice(3))
+    : null;
+
   const acts = [
-    { label: "Reproducir", fn: () => playTrack(t.id, visibleTracks()) },
-    { label: "Reproducir a continuación", fn: () => {
-        if (!state.queue.length) { playTrack(t.id); return; }
+    {
+      label: "Reproducir",
+      fn: () => playTrack(t.id, visibleTracks())
+    },
+
+    ...(t.remote && !t.blob
+      ? [{
+          label: "Descargar para escuchar sin internet 🎵",
+          fn: () => downloadTrack(t)
+        }]
+      : []),
+
+    {
+      label: "Reproducir a continuación",
+      fn: () => {
+        if (!state.queue.length) {
+          playTrack(t.id);
+          return;
+        }
+
         state.queue = state.queue.filter(i => i !== t.id);
+
         const at = state.queue.indexOf(state.current);
-        state.queue.splice(at + 1, 0, t.id); state.queueIdx = state.queue.indexOf(state.current);
+
+        state.queue.splice(at + 1, 0, t.id);
+        state.queueIdx = state.queue.indexOf(state.current);
+
         toast("Sonará a continuación");
-      } },
-    ...(t.remote && !state.tracks.some(x => x.id === t.id) ? [{ label: "Guardar en mi biblioteca", fn: async () => { await ensureSaved(t); renderMain(); toast("Guardada en tu biblioteca"); } }] : []),
-    { label: "Añadir a una lista…", fn: () => addToListMenu(t) },
-    { label: t.fav ? "Quitar de favoritas" : "Marcar como favorita", fn: () => toggleFav(t) },
+      }
+    },
+
+    ...(t.remote && !state.tracks.some(x => x.id === t.id)
+      ? [{
+          label: "Guardar en mi biblioteca",
+          fn: async () => {
+            await ensureSaved(t);
+            renderMain();
+            toast("Guardada en tu biblioteca");
+          }
+        }]
+      : []),
+
+    {
+      label: "Añadir a una lista…",
+      fn: () => addToListMenu(t)
+    },
+
+    {
+      label: t.fav
+        ? "Quitar de favoritas"
+        : "Marcar como favorita",
+      fn: () => toggleFav(t)
+    }
   ];
-  if (inPl) acts.push({ label: "Quitar de esta lista", fn: async () => { inPl.ids = inPl.ids.filter(i => i !== t.id); await dbPut("playlists", inPl); renderMain(); } });
-  if (state.tracks.some(x => x.id === t.id)) acts.push({ label: "Eliminar de la biblioteca", danger: true, fn: () => deleteTrack(t) });
+
+  if (inPl) {
+    acts.push({
+      label: "Quitar de esta lista",
+      fn: async () => {
+        inPl.ids = inPl.ids.filter(i => i !== t.id);
+        await dbPut("playlists", inPl);
+        renderMain();
+      }
+    });
+  }
+
+  if (state.tracks.some(x => x.id === t.id)) {
+    acts.push({
+      label: "Eliminar de la biblioteca",
+      danger: true,
+      fn: () => deleteTrack(t)
+    });
+  }
+
   openSheet(t.title, acts);
 }
 function addToListMenu(t) {
