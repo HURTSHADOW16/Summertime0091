@@ -795,9 +795,6 @@ function playUrl(raw) {
 }
 
 function renderOnline(main) {
-  // lo que ya tenía tu archivo
-}
-function renderOnline(main) {
   const o = state.online;
   const input = h("input", { class: "field", id: "oq", type: "search", placeholder: "Buscar canciones, artistas o géneros", value: o.q || "", autocomplete: "off", "aria-label": "Buscar música en línea" });
   const form = h("form", { class: "form-row" }, input, h("button", { class: "btn primary", type: "submit" }, "Buscar"));
