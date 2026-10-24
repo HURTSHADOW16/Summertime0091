@@ -692,6 +692,15 @@ function playUrl(raw) {
   const t = { id: "url:" + hashHue(raw), title: last || u.hostname, artist: u.hostname, duration: 0, remote: true, art: "", fav: false, url: raw };
   playTrack(t.id, [t]);
 }
+  function escapeHtml(text) {
+  return String(text ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
+}
   function renderYouTube(main) {
   const box = document.createElement("div");
   box.className = "online";
