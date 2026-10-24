@@ -808,14 +808,6 @@ function playUrl(raw) {
 row.querySelector(".youtubePlay").addEventListener("click", () => {
   playTrack(t.id, tracks);
 });
-  player.width = "100%";
-  player.height = "220";
-  player.src = "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(t.youtubeId) + "?autoplay=1";
-  player.title = t.title;
-  player.allow = "autoplay; encrypted-media; picture-in-picture";
-  player.allowFullscreen = true;
-  player.style.border = "0";
-  player.style.borderRadius = "12px";
 
   const oldPlayer = main.querySelector(".youtubeEmbeddedPlayer");
   if (oldPlayer) oldPlayer.remove();
