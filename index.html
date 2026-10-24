@@ -623,9 +623,8 @@ function renderMain() {
 }
 /* ---------- Música en línea (Audius, catálogo abierto de artistas independientes) ---------- */
 const AUDIUS = "https://api.audius.co/v1", APP_NAME = "Summertime";
-  const AUDIUS = "https://api.audius.co/v1", APP_NAME = "Summertime";
   // ===== YOUTUBE =====
-const YOUTUBE_API_KEY = "AIzaSyDDf-BuZNebGbAZ6OgBRCg-QUIgLq-Dg0Q";
+const YOUTUBE_API_KEY = "AIzaSyCCV-1ruZg2X_OjZ3EYG8m5KuSrTkOPt0M";
 
 async function searchYouTube(query) {
   if (!query.trim()) return [];
@@ -789,9 +788,6 @@ function playUrl(raw) {
   input.addEventListener("keydown", e => {
     if (e.key === "Enter") doSearch();
   });
-}
- function renderYouTube(main) {
-  // ...código que pegaste...
 }
 
 function renderOnline(main) {
